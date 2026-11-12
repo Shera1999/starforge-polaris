@@ -1,0 +1,35 @@
+== snapshot_160: 6 boxes, 812,484 gas particles inside them; Y = 0.2703, Z = 0.0142
+   mass fraction with H2 share > 0.5: 0.256, > 0.9: 0.025;  ionized H mass fraction 3.54e-08
+   mu_particle  mass-weighted 5/50/95%: 1.295 / 1.384 / 2.068   mean 1.515
+   mu_gizmo     mass-weighted 5/50/95%: 1.292 / 1.383 / 2.066   mean 1.513
+   mu_drag      mass-weighted 5/50/95%: 1.363 / 1.463 / 2.132   mean 1.591
+   by density (mass-weighted medians):
+     n_H   0e+00-1e+02   cm^-3: mass  0.043  H2 share 0.023  mu_particle 1.291  mu_gizmo 1.289  mu_drag 1.358
+     n_H   1e+02-1e+03   cm^-3: mass  0.449  H2 share 0.075  mu_particle 1.322  mu_gizmo 1.320  mu_drag 1.394
+     n_H   1e+03-1e+04   cm^-3: mass  0.438  H2 share 0.439  mu_particle 1.597  mu_gizmo 1.596  mu_drag 1.689
+     n_H   1e+04-1e+05   cm^-3: mass  0.070  H2 share 0.764  mu_particle 1.962  mu_gizmo 1.960  mu_drag 2.038
+     n_H   1e+05-1e+06   cm^-3: mass  0.000  H2 share 0.941  mu_particle 2.240  mu_gizmo 2.237  mu_drag 2.276
+== snapshot_440: 103 boxes, 10,814,811 gas particles inside them; Y = 0.2703, Z = 0.0142
+   mass fraction with H2 share > 0.5: 0.657, > 0.9: 0.321;  ionized H mass fraction 2.14e-07
+   mu_particle  mass-weighted 5/50/95%: 1.348 / 1.903 / 2.350   mean 1.882
+   mu_gizmo     mass-weighted 5/50/95%: 1.343 / 1.900 / 2.347   mean 1.879
+   mu_drag      mass-weighted 5/50/95%: 1.422 / 1.985 / 2.364   mean 1.944
+   by density (mass-weighted medians):
+     n_H   0e+00-1e+02   cm^-3: mass  0.079  H2 share 0.118  mu_particle 1.350  mu_gizmo 1.344  mu_drag 1.425
+     n_H   1e+02-1e+03   cm^-3: mass  0.421  H2 share 0.458  mu_particle 1.615  mu_gizmo 1.612  mu_drag 1.706
+     n_H   1e+03-1e+04   cm^-3: mass  0.442  H2 share 0.892  mu_particle 2.155  mu_gizmo 2.153  mu_drag 2.206
+     n_H   1e+04-1e+05   cm^-3: mass  0.058  H2 share 0.994  mu_particle 2.339  mu_gizmo 2.336  mu_drag 2.355
+     n_H   1e+05-1e+06   cm^-3: mass  0.001  H2 share 1.000  mu_particle 2.351  mu_gizmo 2.348  mu_drag 2.365
+     n_H   1e+06-1e+12   cm^-3: mass  0.000  H2 share 1.000  mu_particle 2.351  mu_gizmo 2.348  mu_drag 2.365
+== snapshot_500: 92 boxes, 14,548,230 gas particles inside them; Y = 0.2703, Z = 0.0142
+   mass fraction with H2 share > 0.5: 0.885, > 0.9: 0.627;  ionized H mass fraction 6.58e-07
+   mu_particle  mass-weighted 5/50/95%: 1.495 / 2.287 / 2.351   mean 2.127
+   mu_gizmo     mass-weighted 5/50/95%: 1.491 / 2.283 / 2.348   mean 2.123
+   mu_drag      mass-weighted 5/50/95%: 1.582 / 2.314 / 2.365   mean 2.169
+   by density (mass-weighted medians):
+     n_H   0e+00-1e+02   cm^-3: mass  0.043  H2 share 0.317  mu_particle 1.493  mu_gizmo 1.482  mu_drag 1.580
+     n_H   1e+02-1e+03   cm^-3: mass  0.341  H2 share 0.788  mu_particle 1.995  mu_gizmo 1.990  mu_drag 2.067
+     n_H   1e+03-1e+04   cm^-3: mass  0.468  H2 share 0.985  mu_particle 2.322  mu_gizmo 2.319  mu_drag 2.341
+     n_H   1e+04-1e+05   cm^-3: mass  0.129  H2 share 1.000  mu_particle 2.351  mu_gizmo 2.348  mu_drag 2.364
+     n_H   1e+05-1e+06   cm^-3: mass  0.017  H2 share 1.000  mu_particle 2.351  mu_gizmo 2.348  mu_drag 2.365
+     n_H   1e+06-1e+12   cm^-3: mass  0.003  H2 share 1.000  mu_particle 2.351  mu_gizmo 2.348  mu_drag 2.365

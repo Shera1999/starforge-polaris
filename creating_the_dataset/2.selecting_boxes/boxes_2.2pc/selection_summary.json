@@ -1,0 +1,21 @@
+{
+  "created_utc": "2026-10-14T14:45:12.696605+00:00",
+  "script_sha256": "5a1ed31559532416ce7be377d8b1cb096b3ee1c7668ac7ee3365610cd45d4af1",
+  "step1_root": "/home/ilion/0/sjafaritabar/STARFORGE/creating_the_dataset/1.finding_cores/dendrogram_cores_v5.2",
+  "box_side_pc": 2.2,
+  "n_boxes": 1908,
+  "n_snapshots_with_boxes": 38,
+  "n_cores_total": 11599,
+  "n_cores_in_no_box": 3604,
+  "core_mass_total_Msun": 4534.887936743784,
+  "core_mass_in_no_box_Msun": 1248.6989139900709,
+  "n_families": 317,
+  "largest_family": 260,
+  "family_size_quantiles": {
+    "0.5": 2.0,
+    "0.9": 9.400000000000034,
+    "0.99": 106.51999999999867
+  },
+  "n_boxes_with_sink": 52,
+  "n_boxes_gas_bound_central_core": 5
+}

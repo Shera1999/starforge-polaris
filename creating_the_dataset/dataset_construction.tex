@@ -1,0 +1,705 @@
+% =====================================================================================================
+% Thesis section: construction of the STARFORGE + POLARIS dust-emission and polarization dataset.
+% Include with \input{dataset_construction}. Required packages in the preamble:
+%   \usepackage{amsmath}  \usepackage{booktabs}  \usepackage{graphicx}  \usepackage{longtable}
+% References are in dataset_construction.bib (\bibliography{dataset_construction}).
+% Every number below is taken from the pipeline code, its logs, manifests and the audit report
+% (paths in Sect. "Data products and code"); dates are UTC.
+% =====================================================================================================
+
+\section{A synthetic dust-emission and polarization dataset of star-forming cores}
+\label{sec:dataset}
+
+This section describes how the training data for this thesis were constructed. Starting from a
+magnetohydrodynamic simulation of a star-forming molecular cloud, dense cores were identified in every
+simulation snapshot, a $2.2\,\mathrm{pc}$ cube around each selected core was converted into a radiative-transfer
+model, and the dust temperature, grain alignment and polarized dust emission of every cube were computed with
+the Monte Carlo code POLARIS. The resulting images were combined with the three-dimensional state of the gas
+into a table with one row per line of sight. Table~\ref{tab:pipeline} summarises the five steps.
+
+\begin{table}[ht]
+  \centering
+  \caption{The five steps of the pipeline. Each step is a separate script; versions refer to the
+  version strings recorded in each step's output.}
+  \label{tab:pipeline}
+  \small
+  \begin{tabular}{@{}llll@{}}
+    \toprule
+    Step & Task & Product & Code (version) \\
+    \midrule
+    1 & Dense cores in every snapshot   & 11\,599 cores in 51 snapshots & \texttt{find\_starforge\_cores\_dendrogram\_v5.py} (5.2.0) \\
+    2 & Non-overlapping boxes, families & 1908 boxes, 317 families     & \texttt{select\_boxes.py} \\
+    3 & POLARIS grids and commands      & 1908 grids of $64^3$ cells    & \texttt{prepare\_grids.py} (3.5.1) \\
+    4 & Radiative transfer              & 1908 runs, 217\,512 images    & \texttt{run\_polaris.py}, POLARIS \\
+    5 & Sightline table                 & 23\,445\,504 rows, 1443 columns & \texttt{build\_dataset.py} (1.1.1 / 1.2.0) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% -----------------------------------------------------------------------------------------------------
+\subsection{The STARFORGE simulation}
+\label{sec:dataset:sim}
+
+The gas data come from the STARFORGE \citep{Grudic2021} simulation \texttt{M2e5\_R30\_Res585}, run with the
+meshless magnetohydrodynamics code GIZMO \citep{Hopkins2015} (header \texttt{GIZMO\_version} 2022). The initial
+condition is a uniform-density spherical cloud of $2\times10^{5}\,M_\odot$ and radius $30\,\mathrm{pc}$ (measured:
+$1.993\times10^{5}\,M_\odot$ inside $R=30\,\mathrm{pc}$, median density $1.19\times10^{-22}\,\mathrm{g\,cm^{-3}}$)
+embedded in a periodic box of side $300\,\mathrm{code\ units}=300.42\,\mathrm{pc}$. The initial three-dimensional
+velocity dispersion of the cloud is $5.86\,\mathrm{km\,s^{-1}}$, which corresponds to a virial parameter
+$\alpha=2$; the initial gas temperature is $\approx12\,\mathrm{K}$; gas cells have a median mass of
+$1.001\times10^{-3}\,M_\odot$ (range $1.001$--$1.301\times10^{-3}\,M_\odot$). The interstellar radiation field
+strength parameter in the snapshot header is $1$; solar abundances are $Z_\odot=0.0142$, $Y_\odot=0.2703$.
+
+\paragraph{Units.} The code units are $1.0014\,\mathrm{pc}$ (length), $1.0008\,M_\odot$ (mass) and
+$1\,\mathrm{m\,s^{-1}}$ (velocity), so one code time unit is $979.16\,\mathrm{Myr}$. The units were verified
+against the initial conditions (\texttt{check\_snapshot\_units.py}): with these units the gravitational constant
+derived from the header units agrees with the header value to $3.4\times10^{-4}$, the enclosed mass and density
+match the nominal cloud, and the velocity dispersion matches $\alpha=2$. The saved \texttt{MagneticField} is in
+tesla, \emph{not} in the unit given by the header field \texttt{Internal\_UnitB\_In\_Gauss}
+($2.91\times10^{-9}\,\mathrm{G}$): read in tesla, the initial cloud field is $7.19\,\mu\mathrm{G}$, consistent
+(within a factor $1.26$, the uncertainty of the critical mass-to-flux normalisation) with the nominal
+normalised mass-to-flux ratio $4.2$, whereas the gauss or header-unit readings are off by four or more
+orders of magnitude. POLARIS expects the field in tesla, so the field is passed on unconverted.
+
+\paragraph{Snapshots.} Snapshots \texttt{snapshot\_000} to \texttt{snapshot\_500} in steps of 10 were analysed
+(51 snapshots, each $\approx 31\,\mathrm{GB}$ with $\approx 2.5\times10^{8}$ gas cells). Dense cores exist from
+snapshot 130 onwards. Snapshots 130--420 are $0.0406\,\mathrm{Myr}$ apart (0.528--1.707\,Myr); snapshots
+420--500 are $0.406\,\mathrm{Myr}$ apart (1.707--4.957\,Myr). Sink particles (stars) exist only in the late
+snapshots.
+
+% -----------------------------------------------------------------------------------------------------
+\subsection{Step 1: dense cores}
+\label{sec:dataset:cores}
+
+\paragraph{Molecular density.} For every gas cell the molecular hydrogen number density is
+\begin{equation}
+  n_{\mathrm{H_2}} = \frac{\rho\, X_\mathrm{H}\, f_\mathrm{neutral}\, f_\mathrm{mol}}{2\,m_\mathrm{H}},\qquad
+  X_\mathrm{H} = 1 - Z - Y,
+  \label{eq:nh2}
+\end{equation}
+where $\rho$ is the cell density, $Z$ and $Y$ are the first two columns of \texttt{Metallicity},
+$f_\mathrm{neutral}$ is \texttt{NeutralHydrogenAbundance}, $f_\mathrm{mol}$ is \texttt{MolecularMassFraction},
+and $m_\mathrm{H}=1.6735575\times10^{-24}\,\mathrm{g}$. Invalid or out-of-range inputs abort the run instead of
+being clipped.
+
+\paragraph{Dendrogram.} Cells with $n_{\mathrm{H_2}} > 10^{4}\,\mathrm{cm^{-3}}$ were selected. Two selected cells
+are neighbours if either lies within the kernel support radius $h$ (\texttt{SmoothingLength}) of the other,
+using periodic distances; the resulting graph was symmetrised. A dendrogram \citep{Rosolowsky2008} was computed
+with \texttt{astrodendro} 0.3.1 on this particle graph with
+$\texttt{min\_value}=10^{4}\,\mathrm{cm^{-3}}$, $\texttt{min\_delta}=10^{4}\,\mathrm{cm^{-3}}$ and
+$\texttt{min\_npix}=100$ cells. Every leaf of the dendrogram, i.e.\ a local maximum of $n_{\mathrm{H_2}}$
+with at least 100 cells and a contrast of at least $10^{4}\,\mathrm{cm^{-3}}$ above the level at which it
+merges with a neighbour, is a \emph{core}. A leaf is a density peak; it is not required to be gravitationally
+bound or associated with a star.
+
+\paragraph{Core properties.} For each core the catalogue records, among others, the peak cell (position,
+$n_{\mathrm{H_2}}$, particle ID), mass, volume and radii, shape, internal velocity dispersion, mean gas and dust
+temperature, mass-weighted field, the gas-only virial ratio $2(K+U)/|W|$ (direct pair summation with
+$10^{-3}\,\mathrm{pc}$ Plummer softening, up to $2\times10^{4}$ cells), and the sink particles near the core,
+including the number of sinks within a $2.2\,\mathrm{pc}$ cube centred on the peak.
+Step 1 found 11\,599 cores in total (none before snapshot 130; 1038 in snapshot 500) with a total mass of
+$4535\,M_\odot$.
+
+% -----------------------------------------------------------------------------------------------------
+\subsection{Step 2: boxes and families}
+\label{sec:dataset:boxes}
+
+\paragraph{Box selection.} A \emph{box} is an axis-aligned cube of side $S=2.2\,\mathrm{pc}$ centred on a core's
+density peak. Within each snapshot, boxes were selected by greedy non-maximum suppression: cores were sorted by
+mass (ties, which are common because core masses are multiples of the cell mass, broken by higher peak density,
+then lower \texttt{core\_id}), and a core was kept unless its cube overlapped an already kept cube. Two cubes
+overlap if the periodic Chebyshev distance between their centres is $<S$. This gives 1908 boxes in 38 snapshots
+(130--500; 1 to 104 boxes per snapshot, median 55). The central cores have masses of $0.10$--$9.09\,M_\odot$
+(median $0.41\,M_\odot$) and peak densities $n_{\mathrm{H_2}}=2.0\times10^{4}$--$7.0\times10^{9}\,\mathrm{cm^{-3}}$
+(median $3.9\times10^{4}\,\mathrm{cm^{-3}}$). Of all cores, 3604 ($1249\,M_\odot$) lie in no box: they were
+suppressed by a more massive neighbour without lying inside its cube.
+
+\paragraph{Families.} Boxes of consecutive snapshots largely image the same gas. Two boxes in consecutive
+snapshots (consecutive among snapshots that contain boxes) were therefore linked if their cubes overlap
+(periodic Chebyshev distance $<S$), and the connected components of these links, found with a union--find
+structure, were labelled \texttt{family\_id}. The 1908 boxes form 317 families; the median family has 2 boxes,
+the 90th percentile 9.4, the 99th percentile 107, and the largest family has 260 boxes. Six families have more
+than 50 boxes. Families are the unit of the train/validation/test split (Sect.~\ref{sec:dataset:splits}).
+
+% -----------------------------------------------------------------------------------------------------
+\subsection{Step 3: radiative-transfer models}
+\label{sec:dataset:grids}
+
+\paragraph{Grid geometry.} Each box was converted into a POLARIS octree grid that is a uniform cube of
+$64^{3}$ cells (octree level 6) of size $\Delta=2.2/64=0.034375\,\mathrm{pc}$. The grid is shifted by half a
+cell so that the core's peak cell lies at the centre of cell $(32,32,32)$; centring the cube exactly on the peak
+would place the peak on a corner shared by eight cells. Each snapshot was read once and the gas of all its boxes
+was cut out in that single pass; boxes were then built in parallel.
+
+\paragraph{Deposition.} Every gas cell whose kernel overlaps the cube (centre within $S/2+h$ of the box centre
+along each axis) was deposited with GIZMO's compact cubic-spline kernel,
+\begin{equation}
+  W(q) \propto \begin{cases} 1-6q^{2}+6q^{3}, & 0\le q<\tfrac12,\\ 2(1-q)^{3}, & \tfrac12\le q<1,\\ 0, & q\ge 1,\end{cases}
+  \qquad q = \frac{|\mathbf{x}_c-\mathbf{x}_i|}{h_i},
+\end{equation}
+sampled at the centres $\mathbf{x}_c$ of all grid cells within the kernel, \emph{including cells outside the cube}.
+The weights $w_{ic}=W(q_{ic})/\sum_{c'}W(q_{ic'})$ are normalised over the full kernel and only the in-cube part
+is kept, so each grid holds exactly the mass inside the cube and the faces are not under-dense. If a kernel
+contains no cell centre ($h_i$ well below $\Delta$), the cell's mass goes to the grid cell containing its centre
+(this applied to 1.07\% of the $2.73\times10^{8}$ deposited gas cells). Cell quantities are
+\begin{equation}
+  \rho_c = \frac{\sum_i m_i w_{ic}}{\Delta^{3}},\qquad
+  \langle X\rangle_c = \frac{\sum_i m_i w_{ic} X_i}{\sum_i m_i w_{ic}},
+\end{equation}
+with $X$ the dust temperature, gas temperature and the three field components (mass-weighted means). A cell
+receiving no mass would get a density floor of $10^{-6}$ times the smallest occupied density and the fields of
+the nearest occupied cell; this happened for a single cell in a single box ($3.6\times10^{-14}\,M_\odot$).
+The grid mass agrees with the mass of the gas cells centred inside the cube to between $-0.12\%$ and $+0.08\%$.
+Boxes contain $3.5\times10^{4}$--$7.9\times10^{5}$ contributing gas cells (median $1.3\times10^{5}$) and
+$27.6$--$748.6\,M_\odot$ of gas (median $113\,M_\odot$).
+
+\paragraph{Grid fields.} The grid stores (POLARIS field IDs in brackets) the gas number density
+$n=\rho/(\mu m_u)$ in $\mathrm{m^{-3}}$ [0], the STARFORGE dust temperature [2], the gas temperature [3] and
+$B_x, B_y, B_z$ in tesla [4--6]. The POLARIS branch used reads the gas density only as a number density and
+converts it back with $\rho=n\,\mu\,m_u$, where $m_u=1.66053904\times10^{-27}\,\mathrm{kg}$ (POLARIS's
+\texttt{m\_H}); the same $n$ and $\mu$ enter the radiative-torque calculation (gas damping, thermal speed).
+$\mu$ is therefore the mean mass per gas particle. We use $\mu=2.33$: the mass-weighted median of the particle
+mean molecular weight of box gas, computed from the snapshot chemistry, is 2.32--2.35 for
+$n_\mathrm{H}=10^{3}$--$10^{6}\,\mathrm{cm^{-3}}$ (diagnostic \texttt{check\_mu.py}, snapshot 500), and
+$\rho$, hence the dust mass, is reproduced exactly for any $\mu$.
+
+\paragraph{Dust.} One dust component was used: astrodust \citep{Hensley2023} without iron inclusions
+($f_\mathrm{Fe}=0$), with the catalogue's magnetic susceptibility $\chi=4.47\times10^{-4}$ and material density
+$2898\,\mathrm{kg\,m^{-3}}$, a power-law size distribution $\mathrm{d}n/\mathrm{d}a\propto a^{-3.5}$
+\citep{Mathis1977} between $a_\mathrm{min}=5\,\mathrm{nm}$ and $a_\mathrm{max}=250\,\mathrm{nm}$, and a
+dust-to-gas mass ratio of $0.01$ (POLARIS \texttt{<mass\_fraction>}). The ratio is the one STARFORGE itself
+uses: its field \texttt{DustToGasRatio\_Local} stores $Z$ times the local dust-to-metals ratio relative to solar,
+with a median of $0.01416=Z_\odot$ over all boxes, which corresponds to an absolute dust-to-gas ratio
+$0.01\,Z/Z_\odot = 0.01$. The catalogue covers $1\,\mathrm{nm}$--$1\,\mu\mathrm{m}$ in size and
+$0.05\,\mu\mathrm{m}$--$5\,\mathrm{mm}$ in wavelength, i.e.\ POLARIS's internal wavelength grid
+(100 points, $0.0912$--$2000\,\mu\mathrm{m}$) and all detector wavelengths. With this susceptibility the
+Larmor-precession limit of POLARIS's alignment model is never reached: the smallest Larmor-limited grain size
+over all $5.0\times10^{8}$ grid cells is $408\,\mathrm{nm}>a_\mathrm{max}$ (\texttt{check\_larmor\_limit.py}).
+
+\paragraph{Radiation sources.} Every box is illuminated by the interstellar radiation field (ISRF) of
+\citet{Mathis1983} with strength $G_0=1$, launched from a sphere of 10 times the circumscribed radius of the grid
+($10\times\tfrac{\sqrt3}{2}\times2.2\,\mathrm{pc}=19.1\,\mathrm{pc}$). In addition, every sink particle inside the
+cube with positive radius and luminosity was added as a blackbody point source at its position, with the
+STARFORGE protostellar radius $R_\ast$ and an effective temperature from
+$L_\ast = 4\pi R_\ast^{2}\sigma_\mathrm{SB}T_\mathrm{eff}^{4}$. Fifty-two boxes contain stars, 275 sources in total
+(up to 39 in one box): $L_\ast=6.8\times10^{-3}$--$1.0\times10^{4}\,L_\odot$ (median $0.16\,L_\odot$),
+$R_\ast=0.31$--$20.8\,R_\odot$, $T_\mathrm{eff}=2990$--$27\,900\,\mathrm{K}$, sink masses
+$0.02$--$11.7\,M_\odot$. (Step 1 counted 273 sinks in these boxes; in one box, 1851, the half-cell shift of the
+grid moves two further sinks inside the cube.) Boxes without stars are heated by the ISRF only.
+
+\paragraph{Photon numbers and Monte Carlo noise.} With radiative-torque alignment, POLARIS launches the
+requested number of photons for each of its 100 wavelengths. Production used $10^{7}$ ISRF photons and $10^{6}$
+photons per star (per wavelength). These values were chosen from two convergence studies, each running every
+configuration twice with independent random numbers and taking the per-cell noise as
+$\mathrm{median}\,|x_1-x_2|/\sqrt2$:
+(i) ISRF photons $10^{6}$--$10^{7}$ and launch radii 3--30 on box \texttt{snapshot\_440/core\_000395}; at $10^{7}$
+photons and radius 10 the dust-temperature noise is $0.0078\,\mathrm{K}$ in the interior, $0.0087\,\mathrm{K}$ on
+faces, $0.0103\,\mathrm{K}$ on edges and $0.0137\,\mathrm{K}$ in corners ($0.0081\,\mathrm{K}$ overall), the
+alignment radius varies by $0.63\%$, and at $850\,\mu\mathrm{m}$ the noise is $0.026\%$ in $I$, $0.20\%$ in $p$
+and $0.035^\circ$ in the polarization angle. Smaller radii concentrate the noise in the corners
+($0.073\,\mathrm{K}$ at radius 3), larger radii raise it in the interior ($0.0105\,\mathrm{K}$ at radius 30).
+(ii) Star photons $10^{5}$ vs.\ $10^{6}$ on box \texttt{snapshot\_500/core\_000873}: $10^{6}$ halves the
+temperature noise in gas below $25\,\mathrm{K}$ (from 0.077--0.084 to 0.039--0.045\,K) and changes the
+$53\,\mu\mathrm{m}$ intensity by a median of $2.0\%$ ($0.22\%$ at $850\,\mu\mathrm{m}$).
+
+\paragraph{POLARIS tasks.} Each box has a command file with two tasks, both with radiative-torque alignment
+(\texttt{ALIG\_RAT}) and 8 threads:
+\begin{enumerate}
+  \item \texttt{CMD\_TEMP\_RAT}: Monte Carlo radiative transfer of the ISRF and stellar photons; computes the
+  equilibrium dust temperature of every cell and the radiative-torque alignment radius $a_\mathrm{alig}$ (grains
+  larger than $a_\mathrm{alig}$ are aligned with the magnetic field). The STARFORGE dust temperature in the input
+  grid is replaced by this temperature. Writes \texttt{temp/grid\_temp\_rat.dat}.
+  \item \texttt{CMD\_DUST\_EMISSION} on that grid: ray-traced thermal emission of the aligned grains, giving the
+  Stokes $I,Q,U,V$, the optical depth and the column density for 38 wavelengths and 3 viewing directions
+  (114 detectors) with $64\times64$ pixels each (\texttt{max\_subpixel\_lvl} 0). The detector covers the grid, so
+  one pixel corresponds to one grid column ($0.034375\,\mathrm{pc}$); the source distance is
+  $140\,\mathrm{pc}$, so a pixel subtends $50.6''$ and
+  $\Omega_\mathrm{pix}=(\Delta/d)^{2}=6.03\times10^{-8}\,\mathrm{sr}$.
+\end{enumerate}
+The 38 wavelengths (Table~\ref{tab:bands}) are those of common far-infrared to millimetre instruments and are
+read from one table (\texttt{wavelength\_telescope\_mapping.csv}) by both the grid preparation and the dataset
+builder. The three viewing directions are the POLARIS detector rotations
+$(\vartheta_1,\vartheta_2)=(0^\circ,0^\circ)$, $(-90^\circ,0^\circ)$ and $(0^\circ,90^\circ)$, which look along the
+grid $z$, $y$ and $x$ axes (Sect.~\ref{sec:dataset:geometry}). POLARIS was the \texttt{experimental} branch,
+commit \texttt{6c5e1a89c6e14ce806c47bbb87947b98e3f761b0} \citep{Reissl2016}.
+
+% -----------------------------------------------------------------------------------------------------
+\subsection{Step 4: radiative-transfer runs}
+\label{sec:dataset:runs}
+
+All 1908 boxes were run between 2026-10-31 22:47 and 2026-11-09 12:41 on one machine (AMD EPYC 9554P, 64 cores
+/ 128 hardware threads, $377\,\mathrm{GB}$ memory), each box in its own directory, at the lowest scheduling
+priority (\texttt{nice 19}), with up to 16 boxes at a time (8 threads each). The runner measured the CPU use of
+other users every $15\,\mathrm{s}$ and kept 8 hardware threads free above their peak use over the previous
+10 minutes; when the machine was needed, the most recently started boxes were suspended (\texttt{SIGSTOP}) and
+resumed 10 minutes after the demand had gone, so no run was ever killed or restarted. Boxes containing stars
+were run first. A box took $0.92$--$5.98\,\mathrm{h}$ of wall-clock time (median $1.46\,\mathrm{h}$ at up to 14
+concurrent boxes), $2810$ box-hours in total, of which boxes spent $5.3\,\mathrm{h}$ suspended.
+
+Every run was validated before being accepted: the temperature grid exists and all dust temperatures are finite
+and within $2$--$3000\,\mathrm{K}$; all 114 detector files exist; $I$, $Q$ and $U$ are finite everywhere; and at
+wavelengths $\geq50\,\mu\mathrm{m}$, $I>0$ in every pixel and $Q,U$ are not identically zero. All 1908 runs
+finished with exit code 0 and passed; none failed. POLARIS's Monte Carlo is seeded by thread, and the assignment
+of photons to threads varies between runs, so runs are statistically but not bitwise reproducible.
+
+% -----------------------------------------------------------------------------------------------------
+\subsection{Step 5: the sightline dataset}
+\label{sec:dataset:table}
+
+\subsubsection{Geometry and orientation}
+\label{sec:dataset:geometry}
+
+Grid arrays are indexed $[i_x,i_y,i_z]$ and images $[\mathrm{row},\mathrm{col}]$, both from 0 to 63. The mapping
+between them was determined empirically (\texttt{check\_view\_geometry.py}): for each view, the POLARIS
+column-density image was compared with $\sum n\,\Delta$ along each grid axis in all 48 combinations of
+line-of-sight axis, transposition and flips; the best orientation matches to a relative difference of
+$\approx10^{-13}$. Which end of the line of sight faces the observer cannot be seen in optically thin emission; it
+was determined where the dust is optically thick ($21\,\mu\mathrm{m}$, pixels with $\tau>1$), where
+$I=\sum_k B_\nu(T_k)\,\Delta\tau_k\,e^{-\tau_k}$ depends on the side from which the absorption is counted
+(\texttt{check\_observer\_side.py}). The model built from POLARIS's own temperatures reproduces the image with a
+near-constant ratio only if the high-index end of the line-of-sight axis faces the observer, which holds in every
+view. Table~\ref{tab:views} gives the result.
+
+\begin{table}[ht]
+  \centering
+  \caption{Mapping between a dataset row (view $v$, pixel row $r$, pixel column $c$, profile index $k$, with $k=0$
+  the cell nearest the observer) and the grid, and the field components in the image frame.}
+  \label{tab:views}
+  \small
+  \begin{tabular}{@{}cccccc@{}}
+    \toprule
+    View & POLARIS rotation & Line of sight & Image $+$col, $+$row & Grid cell $(i_x,i_y,i_z)$ & $(B_\mathrm{col},B_\mathrm{row},B_\mathrm{los})$ \\
+    \midrule
+    0 & $(0^\circ,0^\circ)$   & $z$ & $+x$, $+y$ & $(c,\ r,\ 63-k)$    & $(B_x,\ B_y,\ -B_z)$ \\
+    1 & $(-90^\circ,0^\circ)$ & $y$ & $+x$, $-z$ & $(c,\ 63-k,\ 63-r)$ & $(B_x,\ -B_z,\ -B_y)$ \\
+    2 & $(0^\circ,90^\circ)$  & $x$ & $-z$, $+y$ & $(63-k,\ r,\ 63-c)$ & $(-B_z,\ B_y,\ -B_x)$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Angles in the image plane are measured from the image $+$col axis towards $+$row. With Stokes $U$ as written by
+POLARIS, the plane-of-sky field direction is the polarization angle plus $90^\circ$: comparing
+$\tfrac12\arctan(U,Q)+90^\circ$ with a density-weighted Stokes model of the grid field in this frame (in the more
+polarized half of the pixels) gives median differences of $0.2^\circ$--$0.8^\circ$, against $22^\circ$--$54^\circ$ if the
+sign of $U$ is reversed. $B_\mathrm{los}>0$ points away from the
+observer. Every box and view was checked during the build: $\sum_k n_k\Delta$ along the rotated profiles
+reproduces POLARIS's column-density image to a maximum relative difference of $5.4\times10^{-13}$
+(the build aborts above $10^{-5}$).
+
+\subsubsection{Contents}
+
+One row is one line of sight: one pixel of one view of one box. The dataset has
+$1908\times3\times64\times64=23\,445\,504$ rows and 1443 columns (Table~\ref{tab:columns}).
+
+\begin{table}[ht]
+  \centering
+  \caption{Columns of the dataset. $k=00\ldots63$ runs along the line of sight from the observer; columns
+  marked (+log) also exist as \texttt{<name>\_log} $=\log_{10}$ (NaN where the value is $\le0$). Values are
+  \texttt{float32} except $I,Q,U$ (\texttt{float64}) and the integer metadata.}
+  \label{tab:columns}
+  \small
+  \begin{tabular}{@{}p{0.17\textwidth}p{0.47\textwidth}p{0.12\textwidth}r@{}}
+    \toprule
+    Group & Columns & Unit & Number \\
+    \midrule
+    metadata & \texttt{snapshot, time\_Myr, core\_id, box\_id, family\_id, n\_stars, split, view, pix\_row, pix\_col} & & 10 \\
+    sightline & \texttt{N\_col, Sigma, Sigma\_dust} (+log) & $\mathrm{cm^{-2}}$, $\mathrm{g\,cm^{-2}}$ & 6 \\
+              & \texttt{temp\_polaris\_mean, temp\_starforge\_mean} (+log) & K & 4 \\
+              & \texttt{B\_tot\_mean} (+log) & $\mu$G & 2 \\
+              & \texttt{cos2psi\_B\_mean, sin2psi\_B\_mean, B\_coherence} & -- & 3 \\
+    bands ($\times38$) & \texttt{<band>\_I, \_Q, \_U} & MJy\,sr$^{-1}$ & 114 \\
+              & \texttt{<band>\_p, \_polangle, \_I\_log, \_p\_log} & --, deg & 152 \\
+    profiles ($\times64$) & \texttt{dens\_k, dens\_dust\_k} (+log) & $\mathrm{cm^{-3}}$, $\mathrm{g\,cm^{-3}}$ & 256 \\
+              & \texttt{temp\_polaris\_k, temp\_starforge\_k} (+log) & K & 256 \\
+              & \texttt{B\_tot\_k, B\_pos\_k} (+log) & $\mu$G & 256 \\
+              & \texttt{cos2psi\_B\_k, sin2psi\_B\_k, sin2gamma\_B\_k} & -- & 192 \\
+              & \texttt{B\_col\_k, B\_row\_k, B\_los\_k} & $\mu$G & 192 \\
+    \midrule
+    total & & & 1443 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Profiles.} For each cell $k$ along the line of sight:
+$\texttt{dens}=n$ in $\mathrm{cm^{-3}}$ (gas particles, $\mu=2.33$);
+$\texttt{dens\_dust}=0.01\,n\,\mu\,m_u$ in $\mathrm{g\,cm^{-3}}$;
+$\texttt{temp\_polaris}$, the dust temperature computed by POLARIS; $\texttt{temp\_starforge}$, the deposited
+STARFORGE dust temperature; the field in $\mu$G ($1\,\mathrm{T}=10^{10}\,\mu\mathrm{G}$) in the image frame
+(Table~\ref{tab:views}) and the derived quantities
+\begin{gather}
+  B_\mathrm{pos}^{2}=B_\mathrm{col}^{2}+B_\mathrm{row}^{2},\qquad B_\mathrm{tot}^{2}=B_\mathrm{pos}^{2}+B_\mathrm{los}^{2},\\
+  \cos2\psi_B=\frac{B_\mathrm{col}^{2}-B_\mathrm{row}^{2}}{B_\mathrm{pos}^{2}},\qquad
+  \sin2\psi_B=\frac{2B_\mathrm{col}B_\mathrm{row}}{B_\mathrm{pos}^{2}},\qquad
+  \sin^{2}\gamma_B=\frac{B_\mathrm{pos}^{2}}{B_\mathrm{tot}^{2}},
+\end{gather}
+where $\psi_B$ is the plane-of-sky field angle and $\gamma_B$ the angle between the field and the line of sight.
+The double-angle form removes the $180^\circ$ ambiguity of the field direction, which dust polarization cannot
+measure.
+
+\paragraph{Sightline quantities.} $N_\mathrm{col}$ is POLARIS's column-density image converted from
+$\mathrm{m^{-2}}$ to $\mathrm{cm^{-2}}$; $\Sigma=N_\mathrm{col}\,\mu m_u$ and $\Sigma_\mathrm{dust}=0.01\,\Sigma$.
+Means are density-weighted, $\langle X\rangle=\sum_k n_kX_k/\sum_k n_k$, for both dust temperatures and
+$B_\mathrm{tot}$. The field orientation that a polarization map measures is described by
+\begin{equation}
+  z = \sum_k n_k\,\sin^{2}\gamma_{B,k}\;e^{2i\psi_{B,k}},\qquad
+  (\texttt{cos2psi\_B\_mean},\texttt{sin2psi\_B\_mean})=\frac{(\operatorname{Re}z,\operatorname{Im}z)}{|z|},\qquad
+  \texttt{B\_coherence}=\frac{|z|}{\sum_k n_k}\in[0,1],
+  \label{eq:coherence}
+\end{equation}
+so \texttt{B\_coherence} combines field tangling along the line of sight and inclination; it correlates with the
+$850\,\mu\mathrm{m}$ polarization fraction with $r=0.87$--$0.94$ (Pearson, per file, in the eight files checked
+by \texttt{validate\_dataset.py}).
+
+\paragraph{Bands.} POLARIS returns $I,Q,U$ in Jy per pixel; they are converted to $\mathrm{MJy\,sr^{-1}}$ by
+dividing by $10^{6}\,\Omega_\mathrm{pix}$. The polarization fraction is $p=\sqrt{Q^{2}+U^{2}}/I$ (NaN where
+$I\le0$) and \texttt{polangle} $=\tfrac12\arctan(U,Q)$ in degrees, mapped to $(-90^\circ,90^\circ]$; it is the
+E-vector angle, and the inferred field angle is $\texttt{polangle}+90^\circ$. $I,Q,U$ are stored in double
+precision because at $3.4$--$5.8\,\mu\mathrm{m}$ the intensities reach $10^{-108}\,\mathrm{MJy\,sr^{-1}}$, below
+the single-precision range. POLARIS was run without stochastic heating of small grains, so the 14 bands at
+$\le25\,\mu\mathrm{m}$ are flagged \texttt{reliable: false} in the manifest; the 24 bands at
+$53\,\mu\mathrm{m}$--$1.38\,\mathrm{mm}$ are reliable. The images contain no observational noise and no beam.
+
+\begin{table}[ht]
+  \centering
+  \caption{The 38 detector wavelengths and band names (column prefixes). Bands at $\le25\,\mu\mathrm{m}$ are
+  flagged unreliable.}
+  \label{tab:bands}
+  \footnotesize
+  \begin{tabular}{@{}rl rl@{}}
+    \toprule
+    $\lambda$ [$\mu$m] & Band & $\lambda$ [$\mu$m] & Band \\
+    \midrule
+    3.4   & \texttt{wise\_1}            & 89    & \texttt{sofia\_hawc\_plus\_c} \\
+    3.6   & \texttt{spitzer\_irac\_1}   & 90    & \texttt{akari\_fis\_90} \\
+    4.5   & \texttt{spitzer\_irac\_2}   & 100   & \texttt{herschel\_pacs\_2\_or\_iras\_100} \\
+    4.6   & \texttt{wise\_2}            & 140   & \texttt{akari\_fis\_140} \\
+    5.8   & \texttt{spitzer\_irac\_3}   & 154   & \texttt{sofia\_hawc\_plus\_d} \\
+    8.0   & \texttt{spitzer\_irac\_4}   & 160   & \texttt{herschel\_pacs\_3} \\
+    8.28  & \texttt{msx\_1}             & 214   & \texttt{sofia\_hawc\_plus\_e} \\
+    12.0  & \texttt{wise\_3\_or\_iras\_12} & 250 & \texttt{herschel\_spire\_1} \\
+    12.13 & \texttt{msx\_2}             & 350   & \texttt{herschel\_spire\_2\_or\_alma\_band\_10\_c43\_8\_or\_planck\_hfi\_857ghz} \\
+    14.65 & \texttt{msx\_3}             & 460   & \texttt{alma\_band\_9\_c43\_8} \\
+    21.34 & \texttt{msx\_4}             & 500   & \texttt{herschel\_spire\_3} \\
+    22.0  & \texttt{wise\_4}            & 550   & \texttt{planck\_hfi\_545ghz} \\
+    24.0  & \texttt{spitzer\_mips\_24}  & 690   & \texttt{alma\_band\_8\_c43\_8} \\
+    25.0  & \texttt{iras\_25}           & 849   & \texttt{planck\_hfi\_353ghz} \\
+    53    & \texttt{sofia\_hawc\_plus\_a} & 870 & \texttt{apex\_laboca} \\
+    60    & \texttt{iras\_60}           & 945   & \texttt{alma\_band\_7\_c43\_8} \\
+    63    & \texttt{sofia\_hawc\_plus\_b} & 1100 & \texttt{cso\_bolocam} \\
+    65    & \texttt{akari\_fis\_65}     & 1300  & \texttt{alma\_band\_6\_c43\_8} \\
+    70    & \texttt{herschel\_pacs\_1}  & 1380  & \texttt{planck\_hfi\_217ghz} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsubsection{Train, validation and test splits}
+\label{sec:dataset:splits}
+
+Boxes in the same family image largely the same gas a short time apart, so splitting by box or by pixel would put
+near-identical data into training and test sets. Whole families were therefore assigned to one split, and all
+three views of a box share its split. Families were shuffled with a fixed seed (NumPy \texttt{default\_rng},
+seed 20261111) and assigned in turn to the split furthest below its target share (80/10/10\% of the boxes) among
+the splits the family fits into; families with more than 50 boxes always go to the training set, so that no single
+region dominates a validation or test set. Two versions of the dataset were built from identical data
+(Table~\ref{tab:splits}):
+
+\begin{itemize}
+  \item \texttt{starforge\_polaris\_dataset\_v1} (builder 1.1.1): the split described above. All 52 boxes with
+  stars belong to families assigned to the training set.
+  \item \texttt{starforge\_polaris\_dataset\_v1\_stars\_eval} (builder 1.2.0, option \texttt{--assign}): as v1, but
+  the four small star-forming families 41 and 226 are moved to validation and 133 and 139 to test; every other box
+  keeps its split. Star-forming families 140 and 280 stay in training because they lie only $3.3$ and
+  $2.8\,\mathrm{pc}$ from the large training family 2. The non-star validation and test families are identical in
+  both versions, so models trained on either can be compared on that common subset.
+\end{itemize}
+
+\begin{table}[ht]
+  \centering
+  \caption{Splits of the two dataset versions (boxes; each box gives $3\times4096$ rows).}
+  \label{tab:splits}
+  \small
+  \begin{tabular}{@{}lrrrrrr@{}}
+    \toprule
+     & \multicolumn{3}{c}{\texttt{v1}} & \multicolumn{3}{c}{\texttt{v1\_stars\_eval}} \\
+    \cmidrule(lr){2-4}\cmidrule(l){5-7}
+    Split & boxes & families & boxes with stars & boxes & families & boxes with stars \\
+    \midrule
+    train      & 1538 (80.6\%) & 207 & 52 & 1458 (76.4\%) & 203 & 36 \\
+    validation &  187 (9.8\%)  &  58 &  0 &  216 (11.3\%) &  60 &  8 \\
+    test       &  183 (9.6\%)  &  52 &  0 &  234 (12.3\%) &  54 &  8 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+In v1 the largest family makes up 17\% of the training set, 16\% of the validation set and 21\% of the test
+set; all three splits span 0.5--5.0\,Myr. All star-forming families lie within the same central region of the
+cloud and appear at late times (snapshots 430--500), with their nearest boxes 2.6--4.8\,pc apart; scores on the
+star-forming test families therefore measure performance on new cores of that region rather than of a different
+cloud.
+
+% -----------------------------------------------------------------------------------------------------
+\subsection{The dataset}
+\label{sec:dataset:contents}
+
+\subsubsection{What one row contains}
+
+Each row describes one line of sight through one box, seen in one of the three viewing directions. It holds
+\begin{enumerate}
+  \item \emph{identifiers} that locate the sightline in the simulation (snapshot, time, core, box, family), in the
+  split, and in its image (view, pixel row and column);
+  \item the \emph{observables} a telescope would measure along this sightline: Stokes $I$, $Q$, $U$, the
+  polarization fraction and the polarization angle in 38 bands;
+  \item \emph{sightline targets}: quantities integrated or averaged along the line of sight (column and surface
+  density, mean dust temperatures, mean field strength, field orientation and coherence);
+  \item \emph{profile targets}: the three-dimensional state of the 64 grid cells along the line of sight, ordered
+  from the observer: gas and dust density, the two dust temperatures and the magnetic field (strength, orientation
+  and components).
+\end{enumerate}
+Observables and targets of the same row refer to exactly the same column of grid cells, and the profiles are
+already in the observer's frame (Table~\ref{tab:views}), so no geometric transformation is needed when using the
+data. Because each row group holds one box and view, the rows of a row group reassemble into a $64\times64$ image
+with \texttt{pix\_row} and \texttt{pix\_col}, and the profile columns of that image into a $64\times64\times64$
+cube; the dataset therefore serves sightline-based (per-pixel) as well as image-based models.
+
+\subsubsection{Files}
+
+The dataset is stored in Apache Parquet format (written by \texttt{pyarrow}, zstd compression); Table~\ref{tab:files}
+lists the files. Each split directory holds one file per snapshot that has boxes in that split, and each file holds
+one row group of 4096 rows per box and view, so a single box and view can be read without reading the rest of the
+file. The data occupy $178\,\mathrm{GB}$ ($166\,\mathrm{GiB}$) per dataset version. Building them from the
+POLARIS output takes 27 minutes with 16 processes.
+
+\begin{table}[ht]
+  \centering
+  \caption{Files of a dataset version (sizes and counts for \texttt{v1}).}
+  \label{tab:files}
+  \small
+  \begin{tabular}{@{}p{0.27\textwidth}p{0.52\textwidth}r@{}}
+    \toprule
+    Path & Content & Size \\
+    \midrule
+    \texttt{data/train/<snapshot>.parquet} & 37 files; 1538 boxes, 4614 row groups, 18\,898\,944 rows & 143.5\,GB \\
+    \texttt{data/val/<snapshot>.parquet}   & 38 files; 187 boxes, 561 row groups, 2\,297\,856 rows & 17.4\,GB \\
+    \texttt{data/test/<snapshot>.parquet}  & 33 files; 183 boxes, 549 row groups, 2\,248\,704 rows & 17.1\,GB \\
+    \texttt{splits.csv} & one line per box: \texttt{box} (\texttt{snapshot\_NNN/core\_NNNNNN}), \texttt{family\_id}, \texttt{split} & \\
+    \texttt{manifest.json} & builder version and path, creation time, input paths, numbers of boxes, rows and columns,
+      geometry conventions, units, the band table with wavelength and \texttt{reliable} flag, split seed, target fractions,
+      sizes (and, in \texttt{v1\_stars\_eval}, the family overrides), the largest column-density mismatch, and a QA record per box
+      (column-density check per view, non-positive intensities per band) & 612\,kB \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsubsection{Columns}
+
+Table~\ref{tab:dictionary} defines every column. In the column names, \texttt{<b>} stands for one of the 38 band
+names of Table~\ref{tab:bands} and \texttt{<k>} for the two-digit cell index \texttt{00}\ldots\texttt{63} along
+the line of sight (\texttt{00} nearest the observer). A column with suffix \texttt{\_log} contains $\log_{10}$ of the
+column without it. Of the 1443 columns, 1320 are single precision (\texttt{float32}), 114 double precision
+(\texttt{float64}: all $I$, $Q$, $U$), 8 integers and one (\texttt{split}) a dictionary-encoded string. The
+dataset contains no missing or non-finite values: \texttt{validate\_dataset.py} scanned every value of every
+column and found none, so the NaN conventions of the builder (logarithm of a non-positive value, $p$ where
+$I\le0$) never apply.
+
+\begingroup
+\small
+\setlength{\LTcapwidth}{\textwidth}
+\begin{longtable}{@{}p{0.27\textwidth}p{0.08\textwidth}p{0.11\textwidth}p{0.46\textwidth}@{}}
+  \caption{Data dictionary. Type: f32/f64 = single/double-precision float, i8/i16/i32 = integers. Counts in
+  brackets give the number of columns of a pattern.}
+  \label{tab:dictionary}\\
+  \toprule
+  Column & Type & Unit & Definition \\
+  \midrule
+  \endfirsthead
+  \multicolumn{4}{@{}l}{\small\emph{Table~\ref{tab:dictionary} continued}}\\
+  \toprule
+  Column & Type & Unit & Definition \\
+  \midrule
+  \endhead
+  \midrule
+  \multicolumn{4}{r@{}}{\small\emph{continued on next page}}\\
+  \endfoot
+  \bottomrule
+  \endlastfoot
+  \multicolumn{4}{@{}l}{\emph{Identifiers} (10 columns)} \\
+  \texttt{snapshot} & i16 & -- & STARFORGE snapshot number, 130--500 \\
+  \texttt{time\_Myr} & f32 & Myr & simulation time of the snapshot, 0.528--4.957 \\
+  \texttt{core\_id} & i32 & -- & ID of the box's central core in the step-1 catalogue of that snapshot \\
+  \texttt{box\_id} & i32 & -- & unique box ID, 0--1907 (step 2) \\
+  \texttt{family\_id} & i32 & -- & cross-snapshot family, 0--316 (Sect.~\ref{sec:dataset:boxes}) \\
+  \texttt{n\_stars} & i16 & -- & number of stellar sources inside the box, 0--39 \\
+  \texttt{split} & string & -- & \texttt{train}, \texttt{val} or \texttt{test} \\
+  \texttt{view} & i8 & -- & viewing direction 0, 1, 2 (Table~\ref{tab:views}) \\
+  \texttt{pix\_row}, \texttt{pix\_col} & i8 & -- & image pixel, 0--63 \\
+  \midrule
+  \multicolumn{4}{@{}l}{\emph{Sightline quantities} (15 columns)} \\
+  \texttt{N\_col} (+\texttt{\_log}) & f32 & cm$^{-2}$ & column density of gas particles from POLARIS's column-density image \\
+  \texttt{Sigma} (+\texttt{\_log}) & f32 & g\,cm$^{-2}$ & gas surface density, $N_\mathrm{col}\,\mu m_u$ \\
+  \texttt{Sigma\_dust} (+\texttt{\_log}) & f32 & g\,cm$^{-2}$ & dust surface density, $0.01\,\Sigma$ \\
+  \texttt{temp\_polaris\_mean} (+\texttt{\_log}) & f32 & K & density-weighted mean POLARIS dust temperature \\
+  \texttt{temp\_starforge\_mean} (+\texttt{\_log}) & f32 & K & density-weighted mean STARFORGE dust temperature \\
+  \texttt{B\_tot\_mean} (+\texttt{\_log}) & f32 & $\mu$G & density-weighted mean field strength $|\mathbf{B}|$ \\
+  \texttt{cos2psi\_B\_mean}, \texttt{sin2psi\_B\_mean} & f32 & -- & direction of $z$ (Eq.~\ref{eq:coherence}): plane-of-sky field orientation seen in polarization \\
+  \texttt{B\_coherence} & f32 & -- & $|z|/\sum_k n_k$, 0--1 (Eq.~\ref{eq:coherence}) \\
+  \midrule
+  \multicolumn{4}{@{}l}{\emph{Bands} (7 columns $\times$ 38 bands = 266)} \\
+  \texttt{<b>\_I} & f64 & MJy\,sr$^{-1}$ & Stokes $I$ \\
+  \texttt{<b>\_Q}, \texttt{<b>\_U} & f64 & MJy\,sr$^{-1}$ & Stokes $Q$, $U$ in the image frame (angles from $+$col towards $+$row) \\
+  \texttt{<b>\_p} & f32 & -- & polarization fraction $\sqrt{Q^2+U^2}/I$ \\
+  \texttt{<b>\_polangle} & f32 & deg & polarization (E-vector) angle $\tfrac12\arctan(U,Q)$ in $(-90,90]$; field angle $=$ \texttt{polangle} $+90^\circ$ \\
+  \texttt{<b>\_I\_log}, \texttt{<b>\_p\_log} & f32 & -- & $\log_{10}$ of $I$ [MJy\,sr$^{-1}$] and of $p$ \\
+  \midrule
+  \multicolumn{4}{@{}l}{\emph{Profiles} (64 cells each, $k=00$ nearest the observer; 1152 columns)} \\
+  \texttt{dens\_<k>} (+\texttt{\_log}) & f32 & cm$^{-3}$ & gas particle density $n=\rho/(\mu m_u)$, $\mu=2.33$ \\
+  \texttt{dens\_dust\_<k>} (+\texttt{\_log}) & f32 & g\,cm$^{-3}$ & dust mass density, $0.01\,\rho$ \\
+  \texttt{temp\_polaris\_<k>} (+\texttt{\_log}) & f32 & K & dust temperature computed by POLARIS (used for the images) \\
+  \texttt{temp\_starforge\_<k>} (+\texttt{\_log}) & f32 & K & STARFORGE dust temperature (mass-weighted deposit) \\
+  \texttt{B\_tot\_<k>} (+\texttt{\_log}) & f32 & $\mu$G & field strength $|\mathbf{B}|$ \\
+  \texttt{B\_pos\_<k>} (+\texttt{\_log}) & f32 & $\mu$G & plane-of-sky field strength $\sqrt{B_\mathrm{col}^2+B_\mathrm{row}^2}$ \\
+  \texttt{cos2psi\_B\_<k>}, \texttt{sin2psi\_B\_<k>} & f32 & -- & plane-of-sky field orientation $\cos2\psi_B$, $\sin2\psi_B$ \\
+  \texttt{sin2gamma\_B\_<k>} & f32 & -- & $\sin^2\gamma_B=B_\mathrm{pos}^2/B_\mathrm{tot}^2$ (1: field in the sky plane; 0: along the line of sight) \\
+  \texttt{B\_col\_<k>}, \texttt{B\_row\_<k>} & f32 & $\mu$G & field components along image $+$col and $+$row \\
+  \texttt{B\_los\_<k>} & f32 & $\mu$G & line-of-sight component, positive away from the observer \\
+\end{longtable}
+\endgroup
+
+\subsubsection{Value ranges}
+
+Table~\ref{tab:ranges} gives the distribution of the main quantities. The sightline and band columns were
+evaluated over all 23\,445\,504 rows of \texttt{v1}; the profile columns over all 64 cells of 300 randomly chosen
+box views ($7.9\times10^{7}$ cells). All column densities in the dataset correspond to optically thin dust at
+long wavelengths ($\tau_{850}\le0.01$, Sect.~\ref{sec:dataset:verification}). Intensities at
+$\le5.8\,\mu\mathrm{m}$ are of order $10^{-108}\,\mathrm{MJy\,sr^{-1}}$ and carry no usable signal.
+
+\begin{table}[ht]
+  \centering
+  \caption{Distribution of selected quantities: minimum, 1st percentile, median, 99th percentile and maximum.}
+  \label{tab:ranges}
+  \small
+  \begin{tabular}{@{}lllllll@{}}
+    \toprule
+    Column & Unit & min & 1\% & median & 99\% & max \\
+    \midrule
+    \multicolumn{7}{@{}l}{\emph{Sightline (all rows)}} \\
+    \texttt{N\_col}               & cm$^{-2}$     & $2.4\times10^{18}$ & $9.9\times10^{19}$ & $9.2\times10^{20}$ & $7.1\times10^{21}$ & $2.5\times10^{23}$ \\
+    \texttt{Sigma}                & g\,cm$^{-2}$  & $9.3\times10^{-6}$ & $3.8\times10^{-4}$ & $3.6\times10^{-3}$ & $2.7\times10^{-2}$ & $0.97$ \\
+    \texttt{temp\_polaris\_mean}  & K             & 8.27 & 12.5 & 14.5 & 16.0 & 54.4 \\
+    \texttt{temp\_starforge\_mean}& K             & 6.16 & 11.3 & 13.3 & 15.5 & 53.8 \\
+    \texttt{B\_tot\_mean}         & $\mu$G        & 0.96 & 9.6 & 25.3 & 58.3 & 1760 \\
+    \texttt{B\_coherence}         & --            & $3.6\times10^{-5}$ & 0.029 & 0.47 & 0.96 & 0.999 \\
+    \midrule
+    \multicolumn{7}{@{}l}{\emph{Bands (all rows)}} \\
+    $I$ (53\,$\mu$m)   & MJy\,sr$^{-1}$ & $3.2\times10^{-4}$ & 0.0074 & 0.018 & 0.072 & $2.1\times10^{6}$ \\
+    $I$ (214\,$\mu$m)  & MJy\,sr$^{-1}$ & 0.083 & 3.3 & 20.5 & 87.4 & $1.2\times10^{5}$ \\
+    $I$ (849\,$\mu$m)  & MJy\,sr$^{-1}$ & 0.0039 & 0.17 & 1.33 & 8.1 & 1380 \\
+    $I$ (1380\,$\mu$m) & MJy\,sr$^{-1}$ & $8.0\times10^{-4}$ & 0.034 & 0.28 & 1.8 & 246 \\
+    $p$ (53\,$\mu$m)   & --  & $1.4\times10^{-5}$ & 0.0059 & 0.098 & 0.259 & 0.355 \\
+    $p$ (214\,$\mu$m)  & --  & $1.0\times10^{-5}$ & 0.0052 & 0.089 & 0.260 & 0.323 \\
+    $p$ (849\,$\mu$m)  & --  & $2.2\times10^{-6}$ & 0.0051 & 0.089 & 0.261 & 0.324 \\
+    $I$ (3.4\,$\mu$m)  & MJy\,sr$^{-1}$ & $7\times10^{-136}$ & $3\times10^{-112}$ & $8\times10^{-108}$ & $1\times10^{-104}$ & $3\times10^{-12}$ \\
+    \midrule
+    \multicolumn{7}{@{}l}{\emph{Profiles (300 box views, all cells)}} \\
+    \texttt{dens}           & cm$^{-3}$    & 0.010 & 5.8 & 73.8 & 2310 & $9.9\times10^{5}$ \\
+    \texttt{dens\_dust}     & g\,cm$^{-3}$ & $3.9\times10^{-28}$ & $2.3\times10^{-25}$ & $2.9\times10^{-24}$ & $8.9\times10^{-23}$ & $3.8\times10^{-20}$ \\
+    \texttt{temp\_polaris}  & K            & 8.37 & 12.7 & 15.0 & 16.1 & 80.0 \\
+    \texttt{temp\_starforge}& K            & 5.91 & 11.3 & 13.4 & 15.6 & 66.8 \\
+    \texttt{B\_tot}         & $\mu$G       & 0.037 & 7.3 & 26.0 & 69.1 & 2380 \\
+    \texttt{B\_pos}         & $\mu$G       & 0.0017 & 2.7 & 20.2 & 60.2 & 2370 \\
+    \texttt{sin2gamma\_B}   & --           & $2.6\times10^{-8}$ & 0.019 & 0.77 & 1.00 & 1.00 \\
+    \texttt{B\_los}         & $\mu$G       & $-1600$ & $-45.8$ & $-6.6$ & 31.8 & 1320 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The intensity spectra of all sightlines peak between 160 and $250\,\mu\mathrm{m}$ (at $214\,\mu\mathrm{m}$ for
+96.8\%), as expected for dust at 12--16\,K. The polarization fraction changes little with wavelength between
+$53\,\mu\mathrm{m}$ and $1.38\,\mathrm{mm}$ (median 0.098 at $53\,\mu\mathrm{m}$, 0.089 at 214 and
+$849\,\mu\mathrm{m}$; maximum 0.355).
+
+\subsubsection{Reading the data}
+
+Columns can be read selectively, which keeps memory small; for example, with \texttt{pandas} and \texttt{pyarrow}:
+\begin{verbatim}
+import pandas as pd, pyarrow.dataset as ds
+root = "/scratch/sjafaritabar/starforge_polaris_dataset_v1/data"
+cols = ["planck_hfi_353ghz_I_log", "planck_hfi_353ghz_p"] + \
+       [f"dens_{k:02d}_log" for k in range(64)]
+train = pd.read_parquet(f"{root}/train", columns=cols)
+full = ds.dataset(root, format="parquet", partitioning=None)   # lazy, all splits
+\end{verbatim}
+To obtain images, a file is read one row group at a time (\texttt{pyarrow.parquet.ParquetFile.read\_row\_group})
+and the 4096 rows are placed at (\texttt{pix\_row}, \texttt{pix\_col}).
+
+% -----------------------------------------------------------------------------------------------------
+\subsection{Verification}
+\label{sec:dataset:verification}
+
+Each step has unit tests (step 2: 7, step 3: 13, step 5: 4; all pass), and an independent audit
+(\texttt{audit\_pipeline.py}) re-derives every stage from the raw files without using the pipeline's code. It
+passed all 15 checks for both dataset versions:
+\begin{enumerate}
+  \item Every boxed core is in its step-1 catalogue with the same peak, peak particle and mass; box times equal
+  the snapshot header times; no two boxes of a snapshot overlap; families re-derived from scratch reproduce all
+  317 \texttt{family\_id}s.
+  \item Exactly one grid per box; for every box the summaries, grids, star lists, command files (photon numbers,
+  radius, dust, wavelengths, views) and POLARIS outputs are mutually consistent, the grid density is unchanged by
+  POLARIS, and dust temperatures and alignment radii are within range.
+  \item The $850\,\mu\mathrm{m}$ intensity in $\mathrm{MJy\,sr^{-1}}$ matches the optically thin model
+  $\sum_k B_\nu(T_k)\,\Delta\tau_k$ computed from the grid, which tests the units, pixel solid angle and distance:
+  POLARIS/model has a per-box median of $1.002$ (range $1.001$--$1.005$); $\tau_{850}\le0.01$.
+  \item No box has an outlying POLARIS-vs-STARFORGE dust-temperature offset ($>5\sigma$).
+  \item Every one of the 1443 columns was recomputed from the raw grids and FITS files with explicit index formulas
+  (Table~\ref{tab:views}) for 1080 random sightlines in 36 boxes ($1.56\times10^{6}$ values); the worst
+  relative (or, for logarithms and angles, absolute) error is $3.8\times10^{-6}$, i.e.\ single-precision rounding.
+  \item \texttt{splits.csv} covers every box once with the step-2 family IDs; no family is in more than one split;
+  all families with more than 50 boxes are in training.
+  \item Polarization fractions at $\ge50\,\mu\mathrm{m}$ are physical (maximum 0.355), and the spectra of all
+  sightlines peak at 60--$500\,\mu\mathrm{m}$ (214\,$\mu$m for 96.8\%).
+\end{enumerate}
+\texttt{validate\_dataset.py} additionally confirms the row counts, the absence of duplicate sightlines and of
+boxes or families in more than one split, and scans every column of every row for non-finite values.
+
+Across the whole dataset, column densities range over $2.4\times10^{18}$--$2.5\times10^{23}\,\mathrm{cm^{-2}}$
+(median $9.1\times10^{20}$), density-weighted POLARIS dust temperatures over 8.3--54.4\,K (median 14.5\,K),
+density-weighted field strengths over $0.96$--$1760\,\mu\mathrm{G}$ (median $25.7\,\mu\mathrm{G}$), and
+\texttt{B\_coherence} over $4\times10^{-5}$--$0.999$ (median 0.48).
+
+% -----------------------------------------------------------------------------------------------------
+\subsection{Limitations}
+\label{sec:dataset:limitations}
+
+\begin{itemize}
+  \item \textbf{Radiation field.} Each box is illuminated by an unattenuated Mathis field with $G_0=1$. In
+  STARFORGE the field reaching the box surfaces is attenuated by the surrounding cloud (snapshot 440: equivalent
+  $G_0$ median 0.20, 5--95\% range 0.11--0.46). POLARIS dust temperatures are therefore higher than the STARFORGE
+  ones, by a per-box median of $+1.49\,\mathrm{K}$ (5--95\%: $+0.29$ to $+2.76\,\mathrm{K}$). Both temperatures
+  are in the dataset.
+  \item \textbf{Isolated boxes.} Only gas inside the $2.2\,\mathrm{pc}$ cube emits and absorbs; foreground and
+  background cloud emission and extinction are absent.
+  \item \textbf{No stochastic heating}: bands at $\le25\,\mu\mathrm{m}$ are not reliable.
+  \item \textbf{Ideal observations.} No noise, no beam, a single distance (140\,pc) and a pixel equal to a grid
+  cell. Noise and beam have to be added when training.
+  \item \textbf{No gas kinematics.} Velocities are not included, so velocity-based field-strength estimates
+  (e.g.\ Davis--Chandrasekhar--Fermi) cannot be reproduced from the dataset alone.
+  \item \textbf{One simulation.} All boxes come from one cloud; families make the evaluation sets independent in
+  gas, not in environment. Late snapshots, which contain all stars, are $0.41\,\mathrm{Myr}$ apart.
+  \item \textbf{Monte Carlo.} Dust temperatures carry $\approx0.008\,\mathrm{K}$ of Monte Carlo noise, and runs
+  are not bitwise reproducible.
+\end{itemize}
+
+% -----------------------------------------------------------------------------------------------------
+\subsection{Data products and code}
+\label{sec:dataset:files}
+
+Code: \texttt{STARFORGE/creating\_the\_dataset/} (\texttt{1.finding\_cores}, \texttt{2.selecting\_boxes},
+\texttt{3.preparing\_polaris\_grids} with its \texttt{diagnostics}, \texttt{4.running\_polaris},
+\texttt{5.building\_dataset}, \texttt{audit\_pipeline.py}); photon studies in
+\texttt{STARFORGE/M2e5\_R30\_Res585/POLARIS/isrf\_photon\_noise\_test} and \texttt{STARFORGE/M2e5\_R30\_Res585/POLARIS/star\_photon\_test}.
+Data: snapshots in \texttt{/scratch/STARFORGE/M2e5\_R30\_Res585}; core catalogues in
+\texttt{1.finding\_cores/dendrogram\_cores\_v5.2}; boxes in \texttt{2.selecting\_boxes/boxes\_2.2pc};
+grids in \texttt{3.preparing\_polaris\_grids/grids\_64}; POLARIS output in
+\texttt{/scratch/sjafaritabar/polaris\_runs} ($\approx70\,\mathrm{GB}$); datasets in
+\texttt{/scratch/sjafaritabar/starforge\_polaris\_dataset\_v1} and
+\texttt{/scratch/sjafaritabar/starforge\_polaris\_dataset\_v1\_stars\_eval}; audit reports in
+\texttt{/scratch/sjafaritabar/audit}.

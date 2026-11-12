@@ -1,0 +1,35 @@
+Snapshot: /scratch/STARFORGE/M2e5_R30_Res585/snapshot_040.hdf5
+Time: 0.162541 Myr
+Molecular fraction convention: neutral-hydrogen; boundary: periodic
+  gas 20,000,000/247,347,337; selected=0
+  gas 40,000,000/247,347,337; selected=0
+  gas 60,000,000/247,347,337; selected=0
+  gas 80,000,000/247,347,337; selected=0
+  gas 100,000,000/247,347,337; selected=0
+  gas 120,000,000/247,347,337; selected=0
+  gas 140,000,000/247,347,337; selected=0
+  gas 160,000,000/247,347,337; selected=0
+  gas 180,000,000/247,347,337; selected=0
+  gas 200,000,000/247,347,337; selected=0
+  gas 220,000,000/247,347,337; selected=0
+  gas 240,000,000/247,347,337; selected=0
+  gas 247,347,337/247,347,337; selected=0
+  graph preflight: 0 directed entries; symmetric graph has at most twice that
+{
+  "run_id": "a76f89e9c134197b83819c7f85f0189d6ddcf6fded681d77ff432f0aa5debdc0",
+  "n_cores": 0,
+  "mass_selected_Msun": 0.0,
+  "mass_leaves_Msun": 0.0,
+  "mass_branches_direct_Msun": 0.0,
+  "mass_pruned_Msun": 0.0,
+  "leaf_fraction_of_selected_mass": null,
+  "n_sink_proximity_v4": 0,
+  "n_support_associated_cores": 0,
+  "n_ambiguous_support_cores": 0,
+  "n_periodic_extent_ambiguous": 0,
+  "gravity_status_counts": {},
+  "gravity_softening_pc": 0.001,
+  "n_gas_bound_2KU_over_W_lt_1": 0,
+  "dendrogram_saved": false
+}
+Saved complete run: /home/ilion/0/sjafaritabar/STARFORGE/creating_the_dataset/dendrogram_cores_v5.2/snapshot_040

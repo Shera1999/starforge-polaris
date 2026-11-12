@@ -1,0 +1,11 @@
+/scratch/STARFORGE/M2e5_R30_Res585/snapshot_500.hdf5: t = 4.957 Myr, 247,237,240 gas particles, 176 sinks, Z_sun(header) = 0.0142
+  Z: min 0.0142, max 0.0142, mass-weighted mean 0.0142  (Z/Z_sun = 1.0000)
+  R = D/Z: exactly 1 for 0.0000%; below 1 for 247,237,240 (100.0000%, mass 247430.210 of 247430.2 Msun); above 1 for 0
+  sinks: D/Z min 1.0000 max 1.0000
+  particles with R < 1, binned by dust temperature:
+    T_dust     0-100    K: N=2,999,874  median R 0.997  median T_gas      50.9 K  median n_H      44.3  median dist to sink 14.1 pc
+    T_dust   100-500    K: N=      126  median R 0.996  median T_gas       143 K  median n_H  1.17e+09  median dist to sink 0.000342 pc
+  particles with R < 1, binned by gas temperature:
+    T_gas    0e+00-1e+03    K: N=1,930,922  median R 0.997  median T_dust     14.4 K  median dist to sink 6.77 pc
+    T_gas    1e+03-1e+04    K: N=1,058,517  median R 0.997  median T_dust     16.9 K  median dist to sink 179 pc
+    T_gas    1e+04-1e+05    K: N=   10,561  median R 0.997  median T_dust     16.9 K  median dist to sink 104 pc

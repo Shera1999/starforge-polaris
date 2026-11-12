@@ -1,0 +1,14 @@
+{
+  "mode": "support",
+  "full_support_graph": true,
+  "neighbors": null,
+  "n_particles": 692443,
+  "n_directed_entries_before_symmetry": 16573099,
+  "n_undirected_edges": 9689040,
+  "n_components": 2874,
+  "n_isolated_particles": 673,
+  "largest_component_n": 79598,
+  "degree_min": 0,
+  "degree_median": 29.0,
+  "degree_max": 256
+}

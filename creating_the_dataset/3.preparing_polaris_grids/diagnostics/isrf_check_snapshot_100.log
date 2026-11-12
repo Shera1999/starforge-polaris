@@ -1,0 +1,9 @@
+/scratch/STARFORGE/M2e5_R30_Res585/snapshot_100.hdf5: Time 0.406 Myr, ISRF strength 1.0, sinks 0
+particles sampled 4,946,947; unshielded (n_H < 0.1 cm^-3): 944,742
+         band [eV]   STARFORGE u     Mathis u  G0 to match
+    13.6-500          0.000e+00    0.000e+00          nan
+       8-13.6         6.624e-14    3.851e-14        1.720
+   3.444-8            3.842e-14    7.320e-14        0.525
+  0.4133-3.444        8.643e-13    5.869e-13        1.473
+   0.001-0.4133       1.040e-12    4.012e-14       25.933
+Mathis field in Habing units (6-13.6 eV): 1.136  (Draine 1978 = 1.69)

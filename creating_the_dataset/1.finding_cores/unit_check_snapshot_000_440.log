@@ -1,0 +1,30 @@
+[header] /scratch/STARFORGE/M2e5_R30_Res585/snapshot_000.hdf5
+  1 code length = 1.00140 pc, 1 code mass = 1.00077 Msun, 1 code velocity = 0.001 km/s, 1 code time = 979.16 Myr
+  G from header units = 4298.34; header Gravitational_Constant_In_Code_Inits = 4296.85  (ratio 1.00034)
+  Time = 0.0000 Myr; BoxSize = 300.42 pc; Internal_UnitB_In_Gauss = 2.9113455219182407e-09
+[initial conditions]
+  mass inside R=30.0 pc: 1.993e+05 Msun (expected 2e+05); total 2.475e+05
+  median density in cloud: 1.194e-22 g/cm^3 (uniform-sphere mean 1.197e-22)
+  3D velocity dispersion in cloud: 5.862 km/s (alpha=2.0 gives ~5.866)
+  median |B| raw: cloud 7.193e-10, background 7.193e-10
+  expected |B| for mu=4.2: 5.709e-06 G = 5.709e-10 T -> raw/T_expected = 1.260, raw/G_expected = 1.26e-04
+  median T in cloud: 12.14 K
+
+[header] /scratch/STARFORGE/M2e5_R30_Res585/snapshot_440.hdf5
+  1 code length = 1.00140 pc, 1 code mass = 1.00077 Msun, 1 code velocity = 0.001 km/s, 1 code time = 979.16 Myr
+  G from header units = 4298.34; header Gravitational_Constant_In_Code_Inits = 4296.85  (ratio 1.00034)
+  Time = 2.5194 Myr; BoxSize = 300.42 pc; Internal_UnitB_In_Gauss = 2.9113455219182407e-09
+[late snapshot: thermodynamics and chemistry, by n_H bin]
+   n_H [cm^-3]       N   gamma   mu(T,u)  T_gas  T_dust  f_neutral  f_mol  x_e     |B| raw  nH2 neutral-conv / total-conv
+    1e-02-  1e+00   240637  1.667   1.249  9231.3    16.9     0.981   0.000  2.2e-02  6.02e-10  0.981
+    1e+00-  1e+02   475792  1.667   1.329    50.1    15.1     1.000   0.089  1.7e-06  1.11e-09  1.000
+    1e+02-  1e+03   409325  1.667   1.503    26.5    14.1     1.000   0.332  6.0e-07  1.52e-09  1.000
+    1e+03-  1e+04  3062987  1.667   2.224    13.3    12.7     1.000   0.934  1.1e-07  2.35e-09  1.000
+    1e+04-  1e+05  1096356  1.667   2.326    12.1    12.0     1.000   0.989  4.7e-08  2.90e-09  1.000
+    1e+05-  1e+07     9366  1.667   2.347     8.8     8.8     1.000   1.000  6.9e-09  5.40e-09  1.000
+  Metallicity col0 (Z): median 0.0142; col1 (Y): median 0.2703; X_H median 0.7155
+  particle mass: median 1.001e-03 Msun, min 1.001e-03, max 1.301e-03
+[sinks] N=1; mass 0.0256-0.0256 Msun; formation time 2.349-2.349 Myr (snapshot time 2.519 Myr; all <= now: True)
+  ProtoStellarAge raw 0.002399-0.002399; StellarFormationTime raw 0.002399-0.002399; Time raw 0.002573
+
+[exited with code 0]

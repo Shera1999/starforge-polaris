@@ -1,0 +1,19 @@
+{
+  "run_id": "3e2560fa170428c7e1f2b20da6d60b0f6a058c30d157ec46c6272bba31497f05",
+  "n_cores": 662,
+  "mass_selected_Msun": 577.0661012651124,
+  "mass_leaves_Msun": 292.9000083523182,
+  "mass_branches_direct_Msun": 229.5109690427258,
+  "mass_pruned_Msun": 54.65512387006617,
+  "leaf_fraction_of_selected_mass": 0.507567517326331,
+  "n_sink_proximity_v4": 7,
+  "n_support_associated_cores": 7,
+  "n_ambiguous_support_cores": 0,
+  "n_periodic_extent_ambiguous": 0,
+  "gravity_status_counts": {
+    "computed_gas_only": 662
+  },
+  "gravity_softening_pc": 0.001,
+  "n_gas_bound_2KU_over_W_lt_1": 2,
+  "dendrogram_saved": true
+}

@@ -1,0 +1,18 @@
+    h=2 cells, face-layer density / true: new 0.999, old 0.980
+    h=6 cells, face-layer density / true: new 1.000, old 0.556
+PASS test_uniform_medium_is_uniform_to_the_faces_and_old_method_was_not
+PASS test_particle_centred_on_face_puts_half_its_mass_inside
+PASS test_mass_accounting_and_field_averaging
+PASS test_small_particles_land_in_their_cell_or_nowhere
+PASS test_empty_cells_get_floor_and_neighbour_fields
+PASS test_octree_roundtrip_maps_position_to_index
+PASS test_cut_boxes_matches_bruteforce_including_periodic_wrap
+PASS test_stars_blackbody_temperature_and_selection
+PASS test_polaris_command_contents
+    96 boxes: identical to old grids deeper than the widest face-crossing kernel (median depth 20 cells; 7 boxes too diffuse to test); face-layer density new/old median 1.049
+PASS test_real_grids_match_old_grids_in_the_interior
+    103 grids have the peak at the centre of cell (32, 32, 32)
+PASS test_production_grids_put_the_peak_in_the_central_cell
+    103 summaries consistent with their grids
+PASS test_real_summaries_are_consistent
+ALL PASSED

@@ -1,0 +1,38 @@
+Snapshot: /scratch/STARFORGE/M2e5_R30_Res585/snapshot_110.hdf5
+Time: 0.446987 Myr
+Molecular fraction convention: neutral-hydrogen; boundary: periodic
+  gas 20,000,000/247,347,337; selected=3
+  gas 40,000,000/247,347,337; selected=3
+  gas 60,000,000/247,347,337; selected=4
+  gas 80,000,000/247,347,337; selected=11
+  gas 100,000,000/247,347,337; selected=11
+  gas 120,000,000/247,347,337; selected=11
+  gas 140,000,000/247,347,337; selected=11
+  gas 160,000,000/247,347,337; selected=11
+  gas 180,000,000/247,347,337; selected=18
+  gas 200,000,000/247,347,337; selected=18
+  gas 220,000,000/247,347,337; selected=18
+  gas 240,000,000/247,347,337; selected=18
+  gas 247,347,337/247,347,337; selected=18
+  graph preflight: 16 directed entries; symmetric graph has at most twice that
+Generating dendrogram using 18 of 18 pixels (100.0% of data)
+
+[========================================>] 100%
+{
+  "run_id": "ba336d5825cfface15e4d64d6b22d93e5ea0965db4f18d3ebee913eae6de1c63",
+  "n_cores": 0,
+  "mass_selected_Msun": 0.018013850699964647,
+  "mass_leaves_Msun": 0.0,
+  "mass_branches_direct_Msun": 0.0,
+  "mass_pruned_Msun": 0.01801385069996465,
+  "leaf_fraction_of_selected_mass": 0.0,
+  "n_sink_proximity_v4": 0,
+  "n_support_associated_cores": 0,
+  "n_ambiguous_support_cores": 0,
+  "n_periodic_extent_ambiguous": 0,
+  "gravity_status_counts": {},
+  "gravity_softening_pc": 0.001,
+  "n_gas_bound_2KU_over_W_lt_1": 0,
+  "dendrogram_saved": true
+}
+Saved complete run: /home/ilion/0/sjafaritabar/STARFORGE/creating_the_dataset/dendrogram_cores_v5.2/snapshot_110

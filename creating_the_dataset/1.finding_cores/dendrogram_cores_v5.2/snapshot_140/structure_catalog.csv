@@ -1,0 +1,3 @@
+structure_idx,parent_structure_idx,trunk_structure_idx,is_leaf,level,direct_n_cells,subtree_n_cells,direct_mass_Msun,subtree_mass_Msun,direct_min_nH2_cm3,direct_max_nH2_cm3
+0,-1,0,True,0,769,769,0.7695917326818313,0.7695917326818313,10011.53968848776,73584.4901621677
+1,-1,1,True,0,202,202,0.20215543563293603,0.20215543563293603,10000.490093146575,22149.65256764263

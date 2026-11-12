@@ -1,0 +1,2 @@
+core 395 (smoke-test box): G0_eff = 0.235; band ratios to Mathis 8-13.6 eV 0.09, 3.444-8 eV 0.06, 0.4133-3.444 eV 0.66
+snapshot_440: 103 boxes, surface G0_eff median 0.202, 5-95% 0.113-0.463, min 0.086, max 0.688; boxes with stars inside: 1

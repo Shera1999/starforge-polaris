@@ -1,0 +1,5 @@
+1908 grids (every 1th of grids_64), 500,170,752 cells; T_d from STARFORGE, s = 0.5, mu = 2.33
+       catalogue       chi  a_larm<100nm: cells / mass / boxes  a_larm<250nm: cells / mass / boxes  a_larm<500nm: cells / mass / boxes   min a_larm
+      fe_0.0_sus  0.000447    0.00e+00 / 0.00e+00 /    0    0.00e+00 / 0.00e+00 /    0    2.00e-09 / 4.40e-08 /    1   408 nm
+      fe_0.1_sus     0.113    0.00e+00 / 0.00e+00 /    0    0.00e+00 / 0.00e+00 /    0    0.00e+00 / 0.00e+00 /    0   9.54e+04 nm
+  fe_0.1 (chi=1)         1    0.00e+00 / 0.00e+00 /    0    0.00e+00 / 0.00e+00 /    0    0.00e+00 / 0.00e+00 /    0   8.41e+05 nm

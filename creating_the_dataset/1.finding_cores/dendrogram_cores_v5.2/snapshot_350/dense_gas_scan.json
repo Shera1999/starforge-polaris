@@ -1,0 +1,16 @@
+{
+  "n_input": 247347337,
+  "n_selected": 161691,
+  "n_below_or_equal_density_threshold": 247185646,
+  "n_dense_rejected_particle_mass": 0,
+  "mass_input_Msun": 247537.66665288067,
+  "mass_selected_Msun": 161.81541852933242,
+  "mass_below_or_equal_density_threshold_Msun": 247375.85123435076,
+  "mass_dense_rejected_particle_mass_Msun": 0.0,
+  "identity_fields": [
+    "ids",
+    "child_ids",
+    "generation"
+  ],
+  "n_duplicate_base_ids_selected": 0
+}
